@@ -55,6 +55,12 @@
   var themeBtn = $('theme');
   var themeMark = $('theme-mark');
   var themeSaid = $('theme-said');
+  var exportChooser = $('export-chooser');
+  var exportHtml = $('export-html');
+  var exportPdf = $('export-pdf');
+  var exportPdfDownload = $('export-pdf-download');
+  var exportCancel = $('export-cancel');
+  var pdfLayout = $('pdf-layout');
 
   function show(node, on) {
     if (node) node.classList.toggle('hidden', !on);
@@ -206,7 +212,7 @@
     renderTotal();
   }
 
-  /** Builds the file, hands it to the browser, and reports on the button. */
+  /** Builds the HTML file, preserving the original export behavior. */
   async function keep(button, note) {
     if (!paper) return;
     var was = button.textContent;
@@ -227,12 +233,51 @@
     }
   }
 
+  function selectedPdfColumns() {
+    var chosen = document.querySelector('input[name="pdf-layout"]:checked');
+    var value = chosen ? Number(chosen.value) : 1;
+    return value === 2 || value === 3 ? value : 1;
+  }
+
+  function closeExportChooser() {
+    show(exportChooser, false);
+    if (exportChooser) exportChooser.setAttribute('aria-hidden', 'true');
+    show(pdfLayout, false);
+    show(exportPdfDownload, false);
+  }
+
+  function openExportChooser() {
+    if (!paper) return;
+    show(exportChooser, true);
+    if (exportChooser) exportChooser.setAttribute('aria-hidden', 'false');
+    show(pdfLayout, false);
+    if (exportHtml) exportHtml.focus();
+  }
+
+  async function chooseHtml() {
+    closeExportChooser();
+    await keep(keepBtn, null);
+  }
+
+  function choosePdf() {
+    if (!paper) return;
+    show(pdfLayout, true);
+    var columns = selectedPdfColumns();
+    try {
+      var result = AR.exporter.downloadPDF(paper, columns);
+      closeExportChooser();
+      say(status, result.name + ' downloaded (' + columns + '-column layout).');
+    } catch (err) {
+      say(status, err && err.message ? err.message : 'The PDF could not be created.', true);
+    }
+  }
+
   function saveButton(label) {
     var button = row('button', 'btn btn-quiet', label);
     button.type = 'button';
     var note = row('span', 'dock-meta');
     button.addEventListener('click', function () {
-      keep(button, note);
+      openExportChooser();
     });
     return { button: button, note: note };
   }
@@ -431,7 +476,33 @@
     hard.addEventListener('click', onLevel);
     makeBtn.addEventListener('click', make);
     keepBtn.addEventListener('click', function () {
-      keep(keepBtn, null);
+      openExportChooser();
+    });
+
+    exportCancel.addEventListener('click', closeExportChooser);
+    exportHtml.addEventListener('click', chooseHtml);
+    exportPdf.addEventListener('click', function () {
+      show(pdfLayout, true);
+      show(exportPdfDownload, true);
+      exportPdfDownload.focus();
+    });
+    exportPdfDownload.addEventListener('click', function () {
+      var columns = selectedPdfColumns();
+      exportPdfDownload.disabled = true;
+      exportPdfDownload.textContent = 'Creating PDF...';
+      try {
+        var result = AR.exporter.downloadPDF(paper, columns);
+        closeExportChooser();
+        say(status, result.name + ' downloaded (' + columns + '-column layout).');
+      } catch (err) {
+        say(status, err && err.message ? err.message : 'The PDF could not be created.', true);
+      } finally {
+        exportPdfDownload.disabled = false;
+        exportPdfDownload.textContent = 'Download PDF';
+      }
+    });
+    exportChooser.addEventListener('click', function (event) {
+      if (event.target === exportChooser) closeExportChooser();
     });
 
     try {
