@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Academic Reviewer</title>
+    <meta
+      name="description"
+      content="Turn your lecture slides and handouts into a reviewer you can take, score, and keep for offline study."
+    />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-in">
+        <span class="wordmark">Academic Reviewer</span>
+        <span class="masthead-right">
+          <span class="masthead-meta" id="head-meta">Nothing uploaded yet</span>
+          <button class="btn btn-quiet btn-small hidden" id="keep" type="button">Save as file</button>
+        </span>
+      </div>
+    </header>
+
+    <main class="shell" id="app">
+      <section class="hero">
+        <h1>Your slides,<br />as a reviewer.</h1>
+        <p>
+          Add the deck or handout you are studying. You get questions drawn from all of it, the correct answers, a
+          score that shows where you slipped, and a file you can keep for when you are offline.
+        </p>
+      </section>
+
+      <section class="section section-flush">
+        <div class="drop" id="drop">
+          <p class="drop-title">Drop your files here</p>
+          <p class="drop-note">
+            PowerPoint, PDF, Word, or plain text. Add as many as you like, from as many subjects as you like.
+          </p>
+          <input
+            class="sr"
+            id="files"
+            type="file"
+            multiple
+            accept=".pdf,.pptx,.pptm,.docx,.docm,.txt,.md,.markdown,.csv"
+          />
+          <label class="btn" for="files" id="pick">Choose files</label>
+        </div>
+        <ul class="files hidden" id="filelist"></ul>
+        <p class="status" id="read-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="section hidden" id="coverage-panel">
+        <div class="panel">
+          <h2>Everything you added is in play</h2>
+          <p class="panel-note" id="coverage-note"></p>
+          <ul class="lattice" id="coverage" aria-hidden="true"></ul>
+        </div>
+      </section>
+
+      <section class="section hidden" id="mix-panel">
+        <div class="panel">
+          <h2>Pick your questions</h2>
+          <p class="panel-note">However many you ask for, they are spread across the whole material.</p>
+
+          <div class="mix" id="mix">
+            <div class="mix-row">
+              <div id="lbl-mcq">
+                <span class="mix-label">Multiple choice</span>
+                <span class="mix-hint">Four options, one of them right</span>
+              </div>
+              <div class="stepper" role="group" aria-labelledby="lbl-mcq" data-type="mcq">
+                <button class="step-btn" type="button" data-step="-1" aria-label="Fewer multiple choice">-</button>
+                <span class="step-value" aria-live="polite">10</span>
+                <button class="step-btn" type="button" data-step="1" aria-label="More multiple choice">+</button>
+              </div>
+            </div>
+
+            <div class="mix-row">
+              <div id="lbl-identification">
+                <span class="mix-label">Identification</span>
+                <span class="mix-hint">Name the term, the unit, the value</span>
+              </div>
+              <div class="stepper" role="group" aria-labelledby="lbl-identification" data-type="identification">
+                <button class="step-btn" type="button" data-step="-1" aria-label="Fewer identification">-</button>
+                <span class="step-value" aria-live="polite">6</span>
+                <button class="step-btn" type="button" data-step="1" aria-label="More identification">+</button>
+              </div>
+            </div>
+
+            <div class="mix-row">
+              <div id="lbl-enumeration">
+                <span class="mix-label">Enumeration</span>
+                <span class="mix-hint">List the parts, the steps, the kinds</span>
+              </div>
+              <div class="stepper" role="group" aria-labelledby="lbl-enumeration" data-type="enumeration">
+                <button class="step-btn" type="button" data-step="-1" aria-label="Fewer enumeration">-</button>
+                <span class="step-value" aria-live="polite">3</span>
+                <button class="step-btn" type="button" data-step="1" aria-label="More enumeration">+</button>
+              </div>
+            </div>
+
+            <div class="mix-row">
+              <div id="lbl-matching">
+                <span class="mix-label">Matching</span>
+                <span class="mix-hint">Column A against column B</span>
+              </div>
+              <div class="stepper" role="group" aria-labelledby="lbl-matching" data-type="matching">
+                <button class="step-btn" type="button" data-step="-1" aria-label="Fewer matching">-</button>
+                <span class="step-value" aria-live="polite">3</span>
+                <button class="step-btn" type="button" data-step="1" aria-label="More matching">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div id="lbl-hard">
+              <div class="field-label">How hard</div>
+              <div class="mix-hint" id="hard-hint">Mostly recall, with a few that make you apply it.</div>
+            </div>
+            <div class="seg" id="hard" role="group" aria-labelledby="lbl-hard">
+              <button class="seg-btn" type="button" data-level="recall" aria-pressed="false">Recall</button>
+              <button class="seg-btn" type="button" data-level="balanced" aria-pressed="true">Balanced</button>
+              <button class="seg-btn" type="button" data-level="hard" aria-pressed="false">Hard</button>
+            </div>
+          </div>
+
+          <div class="field hidden" id="code-field">
+            <div>
+              <label class="field-label" for="code">Access code</label>
+              <div class="mix-hint">This copy is locked. Ask whoever set it up for the code.</div>
+            </div>
+            <input class="answer" id="code" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+
+          <div class="actions">
+            <button class="btn" id="make" type="button">Make my reviewer</button>
+            <span class="dock-meta" id="total"></span>
+          </div>
+
+          <div class="track hidden" id="track"><div class="track-fill" id="track-fill"></div></div>
+          <p class="status" id="status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+    </main>
+
+    <div id="dock"></div>
+
+    <footer class="footer shell">
+      <p>
+        Files are read in your browser. Only the text found in them is sent out, and only to write the questions.
+        Answers are marked on your own device.
+      </p>
+    </footer>
+
+    <script src="assets/js/zip.js" defer></script>
+    <script src="assets/js/extract.js" defer></script>
+    <script src="assets/js/grade.js" defer></script>
+    <script src="assets/js/quiz.js" defer></script>
+    <script src="assets/js/generate.js" defer></script>
+    <script src="assets/js/exporter.js" defer></script>
+    <script src="assets/js/app.js" defer></script>
+  </body>
+</html>
