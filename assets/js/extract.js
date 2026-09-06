@@ -26,7 +26,7 @@
   var MIN_UNIT_CHARS = 16;
   var CHUNK_CHARS = 1100;
 
-  var pdfLib = null;
+  var pdfLib = null; // { lib, cmaps }, filled in once a source answers
 
   function extOf(name) {
     var dot = String(name || '').lastIndexOf('.');
@@ -60,7 +60,12 @@
     }
   }
 
-  /** Loads pdf.js once, from the first source that answers. */
+  /**
+   * Loads pdf.js once, from the first source that answers.
+   *
+   * The cmaps folder is remembered here rather than hung off the module: an
+   * imported namespace is sealed, and assigning to it throws.
+   */
   async function loadPdf() {
     if (pdfLib) return pdfLib;
     var trouble = [];
@@ -71,9 +76,8 @@
       try {
         var lib = await import(base + 'pdf.min.mjs');
         lib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.mjs';
-        lib.arCmaps = base.replace(/build\/$/, '') + 'cmaps/';
-        pdfLib = lib;
-        return lib;
+        pdfLib = { lib: lib, cmaps: base.replace(/build\/$/, '') + 'cmaps/' };
+        return pdfLib;
       } catch (err) {
         trouble.push(PDF_BASES[i] + ' (' + (err && err.message ? err.message : err) + ')');
       }
@@ -82,12 +86,12 @@
   }
 
   async function readPdf(file, emit) {
-    var lib = await loadPdf();
-    var doc = await lib.getDocument({
+    var pdf = await loadPdf();
+    var doc = await pdf.lib.getDocument({
       data: new Uint8Array(await file.arrayBuffer()),
       isEvalSupported: false,
       useWorkerFetch: false,
-      cMapUrl: lib.arCmaps,
+      cMapUrl: pdf.cmaps,
       cMapPacked: true,
     }).promise;
     var pages = doc.numPages;
