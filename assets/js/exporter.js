@@ -4,12 +4,10 @@
  *
  * The HTML file carries its own copy of the stylesheet, the grader and the quiz
  * engine, plus the questions as JSON. Opening it later gives the same quiz,
- * graded the same way, with an answer key that prints on its own page. There
- * is no second implementation to keep in step: the export inlines the very
- * files this page is running.
+ * graded the same way, with an answer key that prints on its own page.
  *
  * The PDF export uses jsPDF and generates formatted notes in single, 2-column,
- * or 3-column layouts.
+ * or 3-column layouts with improved typography and spacing.
  */
 (function (root) {
   'use strict';
@@ -170,9 +168,6 @@
     ].join('\n');
   }
 
-  /* Inlined code must not carry the sequence that would close its own script
-     element. Inside real JavaScript that sequence can only occur in a string or
-     a comment, where the added backslash changes nothing. */
   var CLOSER = new RegExp('<' + '/script', 'gi');
 
   function guard(text) {
@@ -188,7 +183,6 @@
     return 'acadex-' + (slug || 'quiz') + (ext || '.html');
   }
 
-  /** Builds the HTML file without saving it, so callers can show its size first. */
   async function buildHtml(data) {
     var css = guard(await part(CSS));
     var libs = [];
@@ -202,112 +196,171 @@
     };
   }
 
-  /** Generates question text for PDF export */
-  function generateQuestionText(item, index) {
-    var text = (index + 1) + '. ';
+  /** Generates formatting-friendly text arrays for jsPDF rendering */
+  function generateQuestionLines(item, index, doc, colWidth) {
+    var lines = [];
+    var qPrefix = (index + 1) + '. ';
     
+    // Add Question
+    var qText = doc.splitTextToSize(qPrefix + (item.question || ''), colWidth);
+    lines = lines.concat(qText);
+    
+    // Add Format-Specific Structure
     if (item.type === 'mcq') {
-      text += item.question || '';
       if (item.choices && item.choices.length) {
-        text += '\n' + item.choices.map(function(choice, i) {
-          return '  ' + letter(i) + ') ' + choice;
-        }).join('\n');
+        item.choices.forEach(function(choice, i) {
+          var cText = doc.splitTextToSize('    ' + letter(i) + '. ' + choice, colWidth);
+          lines = lines.concat(cText);
+        });
       }
     } else if (item.type === 'identification') {
-      text += item.question || '';
+      lines.push('');
+      lines.push('    _________________________');
     } else if (item.type === 'enumeration') {
-      text += item.question || '';
-      if (item.count) text += ' (' + item.count + ')';
+      var count = item.count || (item.answers ? item.answers.length : 3);
+      lines.push('');
+      for (var e = 0; e < count; e++) {
+        lines.push('    ' + (e + 1) + '. _________________________');
+      }
     } else if (item.type === 'matching') {
-      text += item.question || '';
+      if (item.pairs && item.pairs.length) {
+        var shown = order(item);
+        item.pairs.forEach(function(pair, i) {
+           var rightSideIndex = shown.indexOf(i);
+           var rightChoice = item.pairs[rightSideIndex < 0 ? i : rightSideIndex];
+           // Clean simple layout for matching pairs
+           lines.push('    __ ' + (i + 1) + '. ' + pair.left + '    |    ' + letter(i) + '. ' + rightChoice.right);
+        });
+      }
     }
     
-    return text;
+    return lines;
   }
 
-  /** Builds a PDF file with specified column layout */
+  /** Builds a structured, reviewer-style PDF with proper column wrapping */
   async function buildPdf(data, columns) {
-    // Check if jsPDF is available
     if (typeof window === 'undefined' || !window.jsPDF) {
       throw new Error('jsPDF library is not loaded. Please include it in your HTML.');
     }
 
     var jsPDF = window.jsPDF;
     var doc = new jsPDF.jsPDF();
+    
     var pageWidth = doc.internal.pageSize.getWidth();
     var pageHeight = doc.internal.pageSize.getHeight();
-    var margin = 10;
+    var margin = 14;
+    var columnGap = 8;
+    
+    // Calculate total content width and individual column width
+    var totalGapWidth = (columns - 1) * columnGap;
     var contentWidth = pageWidth - (2 * margin);
-    var columnWidth = contentWidth / columns;
-    var lineHeight = 5;
+    var columnWidth = (contentWidth - totalGapWidth) / columns;
+    
+    var lineHeight = 5.5;
     var currentY = margin;
     var currentColumn = 0;
+    var pageNum = 1;
 
-    // Add title
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.text(data.title || 'Reviewer', margin, currentY);
-    currentY += 15;
+    // Helper: Draw Header and Footer
+    function drawPageFrame(isFirstPage) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text('Page ' + pageNum, pageWidth / 2, pageHeight - 8, { align: 'center' });
+      doc.setTextColor(0); // Reset to black
 
-    // Add metadata
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
-    var meta = (data.made || '') + (data.files && data.files.length ? ' from ' + data.files.map(function(f) { return f.name; }).join(', ') : '');
-    if (meta) {
-      doc.text(meta, margin, currentY);
-      currentY += 8;
+      if (isFirstPage) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text(data.title || 'Reviewer Notes', margin, margin + 4);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        var meta = (data.made || '') + (data.files && data.files.length ? ' from ' + data.files.map(function(f) { return f.name; }).join(', ') : '');
+        if (meta) {
+          doc.text(meta, margin, margin + 10);
+        }
+        
+        doc.setDrawColor(200);
+        doc.line(margin, margin + 14, pageWidth - margin, margin + 14);
+        return margin + 22; // Starting Y for content
+      }
+      return margin + 6;
     }
 
-    // Add questions
-    doc.setFontSize(10);
+    currentY = drawPageFrame(true);
     var items = data.items || [];
     
+    // Render Questions
     items.forEach(function(item, index) {
-      var questionText = generateQuestionText(item, index);
-      var lines = doc.splitTextToSize(questionText, columnWidth - 2);
-      var blockHeight = lines.length * lineHeight + 3;
-
-      // Check if we need a new page
-      if (currentY + blockHeight > pageHeight - margin) {
-        currentY = margin;
-        currentColumn = 0;
-        doc.addPage();
-      }
-
-      // Calculate position based on column layout
-      var xPos = margin + (currentColumn * columnWidth);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
       
-      // Draw the question text
-      doc.text(lines, xPos + 1, currentY);
-      currentY += blockHeight;
+      var lines = generateQuestionLines(item, index, doc, columnWidth);
+      var blockHeight = lines.length * lineHeight;
 
-      // Move to next column if we've filled the current one
-      if (currentColumn < columns - 1 && currentY > pageHeight - margin - 30) {
-        currentColumn += 1;
-        currentY = margin + 35; // Reset to top for next column with space for title
+      // Check if block fits in the current column
+      if (currentY + blockHeight > pageHeight - margin - 12) { // 12 for footer padding
+        currentColumn++;
+        
+        // Check if we need a new page
+        if (currentColumn >= columns) {
+          doc.addPage();
+          pageNum++;
+          currentColumn = 0;
+          currentY = drawPageFrame(false);
+        } else {
+          // Move to next column on the same page
+          currentY = (pageNum === 1) ? margin + 22 : margin + 6;
+        }
       }
+
+      var xPos = margin + (currentColumn * (columnWidth + columnGap));
+      
+      doc.text(lines, xPos, currentY);
+      currentY += blockHeight + 6; // +6 padding below each question
     });
 
-    // Add answer key on a new page
+    // Render Answer Key Page
     doc.addPage();
-    currentY = margin;
+    pageNum++;
+    currentColumn = 0;
+    currentY = drawPageFrame(false);
+
     doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text('Answer Key', margin, currentY);
     currentY += 10;
 
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
+    // Use minimum 2 columns for answers for a compact look, unless explicitly 3
+    var ansColumns = Math.max(2, columns);
+    var ansTotalGap = (ansColumns - 1) * columnGap;
+    var ansColWidth = (contentWidth - ansTotalGap) / ansColumns;
+
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'normal');
+    
     items.forEach(function(item, index) {
       var answer = answerText(item);
-      var lines = doc.splitTextToSize((index + 1) + '. ' + answer, contentWidth);
-      doc.text(lines, margin, currentY);
-      currentY += lines.length * lineHeight + 2;
+      var lines = doc.splitTextToSize((index + 1) + '. ' + answer, ansColWidth);
+      var blockHeight = lines.length * lineHeight;
       
-      if (currentY > pageHeight - margin) {
-        doc.addPage();
-        currentY = margin;
+      if (currentY + blockHeight > pageHeight - margin - 12) {
+        currentColumn++;
+        if (currentColumn >= ansColumns) {
+          doc.addPage();
+          pageNum++;
+          currentColumn = 0;
+          currentY = drawPageFrame(false) + 10;
+        } else {
+          // Align next column's starting Y with the first item below the "Answer Key" header
+          currentY = margin + 16; 
+        }
       }
+      
+      var xPos = margin + (currentColumn * (ansColWidth + columnGap));
+      doc.text(lines, xPos, currentY);
+      currentY += blockHeight + 3;
     });
 
     var pdfBlob = doc.output('blob');
@@ -318,7 +371,6 @@
     };
   }
 
-  /** Builds the HTML file and hands it to the browser's own save dialog. */
   async function saveHtml(data) {
     var file = await buildHtml(data);
     var url = URL.createObjectURL(file.blob);
@@ -335,7 +387,6 @@
     return file;
   }
 
-  /** Builds the PDF file and hands it to the browser's own save dialog. */
   async function savePdf(data, columns) {
     var file = await buildPdf(data, columns || 1);
     var url = URL.createObjectURL(file.blob);
@@ -352,29 +403,23 @@
     return file;
   }
 
-  /** Shows export dialog for user to choose format and options */
   async function showExportDialog(data, callback) {
-    // Create overlay (minimal styling, matches dark theme)
     var overlay = document.createElement('div');
     overlay.className = 'ar-export-overlay';
     overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000; font-family: inherit;';
 
-    // Create dialog (minimal design, respect existing theme)
     var dialog = document.createElement('div');
     dialog.className = 'ar-export-dialog';
     dialog.style.cssText = 'background: #1a1a1a; border-radius: 8px; padding: 24px; max-width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); color: #fff;';
 
-    // Title
     var title = document.createElement('h2');
     title.textContent = 'Save as file';
     title.style.cssText = 'margin: 0 0 12px 0; font-size: 18px; font-weight: 600; color: #fff;';
 
-    // Subtitle
     var subtitle = document.createElement('p');
     subtitle.textContent = 'Choose file format:';
     subtitle.style.cssText = 'margin: 0 0 16px 0; color: #aaa; font-size: 13px;';
 
-    // HTML option
     var htmlOption = document.createElement('div');
     htmlOption.style.cssText = 'margin-bottom: 12px; padding: 12px; border: 1px solid #333; border-radius: 6px; cursor: pointer; transition: all 0.2s; background: #222;';
     htmlOption.onmouseover = function() { 
@@ -401,7 +446,6 @@
       callback({ type: 'html' });
     });
 
-    // PDF option
     var pdfOption = document.createElement('div');
     pdfOption.style.cssText = 'margin-bottom: 12px; padding: 12px; border: 1px solid #333; border-radius: 6px; cursor: pointer; transition: all 0.2s; background: #222;';
     pdfOption.onmouseover = function() { 
@@ -449,11 +493,9 @@
     pdfOption.appendChild(pdfDesc);
     pdfOption.appendChild(columnsGroup);
 
-    // Buttons container
     var buttonsContainer = document.createElement('div');
     buttonsContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 16px;';
 
-    // Cancel button
     var cancelBtn = document.createElement('button');
     cancelBtn.textContent = 'Cancel';
     cancelBtn.style.cssText = 'flex: 1; padding: 8px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 13px; color: #aaa; transition: all 0.2s;';
@@ -481,7 +523,6 @@
     document.body.appendChild(overlay);
   }
 
-  /** Main export function that shows dialog and handles export */
   async function save(data) {
     return new Promise(function(resolve, reject) {
       showExportDialog(data, function(choice) {
