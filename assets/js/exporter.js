@@ -453,13 +453,25 @@
     var y = H - margin;
     var col = 0;
 
+    // The header (title/subtitle/source) is only ever drawn once, above the
+    // column area, on the first page. Every column on that first page must
+    // start BELOW it — not at the very top of the page — or a column-2/3
+    // question lands at the same height as the title and visually collides
+    // with it. topForPage() returns that lowered start for as long as we're
+    // still on the first page (pages.length === 0), and the normal full-height
+    // top for every page after that.
+    var firstPageContentTop = H - margin;
+    function topForPage() {
+      return pages.length === 0 ? firstPageContentTop : H - margin;
+    }
+
     function flushPage() {
       if (current.length) pages.push(current);
       current = [];
     }
     function newPage() {
       flushPage();
-      y = H - margin;
+      y = topForPage();
       col = 0;
     }
     function nextColumn() {
@@ -467,7 +479,7 @@
       if (col >= columns) {
         newPage();
       } else {
-        y = H - margin;
+        y = topForPage();
       }
     }
     function colX() {
@@ -480,9 +492,12 @@
       current.push({ rule: true, x: x, y: yy, width: width });
     }
 
-    // --- Header ---
-    put(pdfText(data.title || 'Acadex Reviewer'), 17, true, margin, y);
-    y -= 22;
+    // --- Header (full width, above all columns) ---
+    wrapMeasured(pdfText(data.title || 'Acadex Reviewer'), usableW, 17, true).forEach(function (line) {
+      put(line, 17, true, margin, y);
+      y -= lineHeightOf(17);
+    });
+    y -= 4;
     put('Acadex Reviewer' + (data.made ? ' - ' + data.made : ''), 8, false, margin, y);
     y -= 14;
     if (data.files && data.files.length) {
@@ -495,6 +510,7 @@
     y -= 8;
     rule(margin, y, usableW);
     y -= 18;
+    firstPageContentTop = y;
 
     // --- Questions ---
     (data.items || []).forEach(function (item, index) {
