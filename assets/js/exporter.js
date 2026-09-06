@@ -4,6 +4,15 @@
  * The HTML exporter is kept intact in behavior. PDF export opens a print-ready
  * document in a new browser tab/window and lets the browser's print dialog save it
  * as a .pdf. The user chooses 1, 2, or 3 columns before printing.
+ *
+ * Both the print-based path (pdfPage) and the byte-level PDF writer
+ * (makePdf/downloadPDF) now:
+ *   - measure text with an actual canvas context before wrapping, instead of
+ *     guessing an average character width, so lines never overrun a column
+ *     and collide with the next one
+ *   - size line-height to each line's real font size
+ *   - fall back across several possible question-text field names, so a
+ *     question never renders blank just because the data uses a different key
  */
 (function (root) {
   'use strict';
@@ -34,6 +43,17 @@
 
   function letter(index) {
     return String.fromCharCode(65 + index);
+  }
+
+  // Some quiz items may store their prompt under a different key depending on
+  // which item type produced them. Check the common possibilities so a
+  // question never silently renders blank.
+  function questionPrompt(item) {
+    var candidates = [item.question, item.prompt, item.text, item.title, item.q];
+    for (var i = 0; i < candidates.length; i += 1) {
+      if (candidates[i] != null && String(candidates[i]).trim() !== '') return candidates[i];
+    }
+    return '';
   }
 
   function order(item) {
@@ -192,7 +212,7 @@
     return file;
   }
 
-  /* ---------------- PDF / print export ---------------- */
+  /* ---------------- PDF / print export (browser print dialog) ---------------- */
 
   function pdfFileName(title) {
     var slug = String(title == null ? '' : title)
@@ -206,7 +226,7 @@
   function questionHTML(item, index) {
     var number = index + 1;
     var html = '<article class="q">';
-    html += '<div class="q-title"><b>' + number + '.</b> ' + esc(item.question || '') + '</div>';
+    html += '<div class="q-title"><b>' + number + '.</b> ' + esc(questionPrompt(item)) + '</div>';
 
     if (item.type === 'mcq') {
       html += '<ol class="choices" type="A">';
@@ -264,19 +284,20 @@
       '.header h1 { margin: 0 0 3px; font-size: 19pt; }',
       '.meta { color: #555; font-size: 8.5pt; }',
       '.questions { column-count: ' + columns + '; column-gap: 9mm; }',
-      '.q { break-inside: avoid; page-break-inside: avoid; margin: 0 0 14px; }',
-      '.q-title { margin-bottom: 7px; }',
-      '.choices { margin: 4px 0 7px 22px; padding: 0; }',
-      '.choices li { padding: 1px 0; }',
+      '.q { break-inside: avoid; page-break-inside: avoid; margin: 0 0 16px; overflow-wrap: break-word; word-break: break-word; }',
+      '.q-title { margin-bottom: 7px; overflow-wrap: break-word; word-break: break-word; }',
+      '.choices { margin: 4px 0 7px 22px; padding: 0; break-inside: avoid; }',
+      '.choices li { padding: 1px 0; overflow-wrap: break-word; word-break: break-word; }',
       '.answer-line { height: 19px; border-bottom: 1px solid #999; margin-top: 5px; }',
-      '.enum-line { display: grid; grid-template-columns: 16px 1fr; gap: 4px; min-height: 20px; align-items: end; }',
+      '.enum-line { display: grid; grid-template-columns: 16px 1fr; gap: 4px; min-height: 20px; align-items: end; margin-bottom: 4px; break-inside: avoid; }',
       '.enum-line span:last-child { border-bottom: 1px solid #999; height: 18px; }',
-      '.matching-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 9.2pt; }',
+      '.matching-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 9.2pt; break-inside: avoid; }',
       '.matching-left, .matching-right { display: grid; gap: 5px; }',
+      '.matching-left div, .matching-right div { overflow-wrap: break-word; word-break: break-word; }',
       '.key { break-before: page; page-break-before: always; }',
       '.key h2 { font-size: 16pt; margin: 0 0 10px; }',
       '.key-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10mm; row-gap: 7px; }',
-      '.key-item { break-inside: avoid; }',
+      '.key-item { break-inside: avoid; overflow-wrap: break-word; word-break: break-word; }',
       '.foot { margin-top: 16px; color: #666; font-size: 8pt; }',
       '@media screen { body { max-width: 210mm; margin: 20px auto; padding: 0 18px; } .key { margin-top: 30px; } }',
       '@media print { .questions { column-fill: balance; } }'
@@ -297,7 +318,7 @@
       '</body></html>';
   }
 
-  /* ---------------- Actual PDF export ---------------- */
+  /* ---------------- Actual PDF export (byte-level, no print dialog) ---------------- */
 
   function pdfText(value) {
     return String(value == null ? '' : value)
@@ -316,18 +337,43 @@
       .replace(/\)/g, '\\)');
   }
 
-  function wrapPdf(text, maxChars) {
+  // Lazily create (and reuse) a canvas 2D context purely for measuring text.
+  // Measuring the real rendered width — instead of guessing an average
+  // character width — is what keeps wrapped lines from overrunning their
+  // column and visually overlapping the next one.
+  var _measureCtx = null;
+  function measureCtx() {
+    if (!_measureCtx) {
+      _measureCtx = document.createElement('canvas').getContext('2d');
+    }
+    return _measureCtx;
+  }
+
+  function fontString(size, bold) {
+    return (bold ? 'bold ' : '') + size.toFixed(2) + 'px Helvetica, Arial, sans-serif';
+  }
+
+  // Wrap `text` to fit within `maxWidth` px at the given font size/weight,
+  // using actual measured widths. Falls back to hard character breaks for
+  // single words wider than the column (e.g. long unbroken strings).
+  function wrapMeasured(text, maxWidth, size, bold) {
+    var ctx = measureCtx();
+    ctx.font = fontString(size, bold);
     var words = pdfText(text).split(/\s+/).filter(Boolean);
+    if (!words.length) return [''];
+
     var lines = [];
     var line = '';
     words.forEach(function (word) {
-      while (word.length > maxChars) {
+      while (ctx.measureText(word).width > maxWidth && word.length > 1) {
+        var cut = word.length;
+        while (cut > 1 && ctx.measureText(word.slice(0, cut)).width > maxWidth) cut -= 1;
         if (line) { lines.push(line); line = ''; }
-        lines.push(word.slice(0, maxChars));
-        word = word.slice(maxChars);
+        lines.push(word.slice(0, cut));
+        word = word.slice(cut);
       }
       var next = line ? line + ' ' + word : word;
-      if (next.length > maxChars && line) {
+      if (line && ctx.measureText(next).width > maxWidth) {
         lines.push(line);
         line = word;
       } else {
@@ -338,44 +384,60 @@
     return lines.length ? lines : [''];
   }
 
-  function pdfQuestionLines(item, number, widthChars) {
+  // Builds the flat list of {text, size, bold} lines for one question, sized
+  // to actually fit `colWidthPx`. `questionPrompt()` covers items whose
+  // prompt lives under a differently-named field (this is what fixes
+  // enumeration items showing blanks with no visible question).
+  function pdfQuestionLines(item, number, colWidthPx, fontScale) {
     var lines = [];
-    wrapPdf(number + '. ' + (item.question || ''), widthChars).forEach(function (line) {
-      lines.push({ text: line, bold: true, size: 10 });
+    var titleSize = 10 * fontScale;
+    var bodySize = 9 * fontScale;
+    var smallSize = 8.5 * fontScale;
+
+    wrapMeasured(number + '. ' + questionPrompt(item), colWidthPx, titleSize, true).forEach(function (line) {
+      lines.push({ text: line, bold: true, size: titleSize });
     });
 
     if (item.type === 'mcq') {
       (item.choices || []).forEach(function (choice, i) {
-        wrapPdf(letter(i) + '. ' + choice, Math.max(10, widthChars - 3)).forEach(function (line) {
-          lines.push({ text: '  ' + line, bold: false, size: 9 });
+        wrapMeasured(letter(i) + '. ' + choice, colWidthPx - 14, bodySize, false).forEach(function (line, idx) {
+          lines.push({ text: (idx === 0 ? '   ' : '     ') + line, bold: false, size: bodySize });
         });
       });
-      lines.push({ text: 'Answer: __________________________________', bold: false, size: 9 });
+      lines.push({ text: 'Answer: ______________________________', bold: false, size: bodySize });
     } else if (item.type === 'identification') {
-      lines.push({ text: 'Answer: ______________________________________________', bold: false, size: 9 });
+      lines.push({ text: 'Answer: ___________________________________________', bold: false, size: bodySize });
     } else if (item.type === 'enumeration') {
       var count = Math.max(1, (item.answers || []).length);
       for (var i = 0; i < count; i += 1) {
-        lines.push({ text: (i + 1) + '. ______________________________________________', bold: false, size: 9 });
+        lines.push({ text: (i + 1) + '. ___________________________________________', bold: false, size: bodySize });
       }
     } else if (item.type === 'matching') {
       var pairs = item.pairs || [];
       var shown = order(item);
-      lines.push({ text: 'Column A:', bold: true, size: 9 });
+      lines.push({ text: 'Column A', bold: true, size: bodySize });
       pairs.forEach(function (pair, i) {
-        wrapPdf((i + 1) + '. ' + (pair.left || ''), widthChars).forEach(function (line) {
-          lines.push({ text: line, bold: false, size: 8.5 });
+        wrapMeasured((i + 1) + '. ' + (pair.left || ''), colWidthPx, smallSize, false).forEach(function (line) {
+          lines.push({ text: line, bold: false, size: smallSize });
         });
       });
-      lines.push({ text: 'Column B:', bold: true, size: 9 });
+      lines.push({ text: 'Column B', bold: true, size: bodySize });
       shown.forEach(function (sourceIndex, i) {
         var pair = pairs[sourceIndex] || {};
-        wrapPdf(letter(i) + '. ' + (pair.right || ''), widthChars).forEach(function (line) {
-          lines.push({ text: line, bold: false, size: 8.5 });
+        wrapMeasured(letter(i) + '. ' + (pair.right || ''), colWidthPx, smallSize, false).forEach(function (line) {
+          lines.push({ text: line, bold: false, size: smallSize });
         });
       });
     }
     return lines;
+  }
+
+  function lineHeightOf(size) {
+    return size * 1.4;
+  }
+
+  function blockHeight(lines) {
+    return lines.reduce(function (sum, line) { return sum + lineHeightOf(line.size); }, 0);
   }
 
   function makePdf(data, columns) {
@@ -385,85 +447,109 @@
     var gap = 18;
     var colW = (usableW - gap * (columns - 1)) / columns;
     var fontScale = columns === 3 ? 0.82 : (columns === 2 ? 0.9 : 1);
-    var bodySize = 10 * fontScale;
-    var lineH = 14 * fontScale;
-    var chars = Math.max(20, Math.floor(colW / (5.1 * fontScale)));
+
     var pages = [];
     var current = [];
     var y = H - margin;
-    var pageIndex = 0;
     var col = 0;
 
-    function newPage() {
+    function flushPage() {
       if (current.length) pages.push(current);
       current = [];
+    }
+    function newPage() {
+      flushPage();
       y = H - margin;
       col = 0;
-      pageIndex += 1;
     }
     function nextColumn() {
       col += 1;
-      if (col >= columns) newPage();
-      else y = H - margin;
+      if (col >= columns) {
+        newPage();
+      } else {
+        y = H - margin;
+      }
     }
-    function ensure(height) {
-      if (y - height < margin) nextColumn();
-      return y - height >= margin;
+    function colX() {
+      return margin + col * (colW + gap);
     }
     function put(text, size, bold, x, yy) {
       current.push({ text: text, size: size, bold: !!bold, x: x, y: yy });
     }
+    function rule(x, yy, width) {
+      current.push({ rule: true, x: x, y: yy, width: width });
+    }
 
-    /* Header on first page. */
+    // --- Header ---
     put(pdfText(data.title || 'Acadex Reviewer'), 17, true, margin, y);
     y -= 22;
     put('Acadex Reviewer' + (data.made ? ' - ' + data.made : ''), 8, false, margin, y);
-    y -= 16;
+    y -= 14;
     if (data.files && data.files.length) {
-      wrapPdf('Source: ' + data.files.map(function (f) { return f.name; }).join(', '), 100).forEach(function (line) {
-        put(line, 7.5, false, margin, y);
-        y -= 10;
-      });
+      wrapMeasured('Source: ' + data.files.map(function (f) { return f.name; }).join(', '), usableW, 8, false)
+        .forEach(function (line) {
+          put(line, 8, false, margin, y);
+          y -= 11;
+        });
     }
-    y -= 6;
+    y -= 8;
+    rule(margin, y, usableW);
+    y -= 18;
 
+    // --- Questions ---
     (data.items || []).forEach(function (item, index) {
-      var lines = pdfQuestionLines(item, index + 1, chars);
-      var needed = lines.length * lineH + 9;
-      if (!ensure(needed)) { /* ensure() already advances column/page */ }
-      var x = margin + col * (colW + gap);
+      var lines = pdfQuestionLines(item, index + 1, colW, fontScale);
+      var needed = blockHeight(lines) + 6;
+      var atColumnTop = y >= H - margin - 1;
+
+      if (y - needed < margin && !atColumnTop) {
+        nextColumn();
+      }
+
+      var x = colX();
       lines.forEach(function (line) {
-        if (y - lineH < margin) {
+        var lh = lineHeightOf(line.size);
+        if (y - lh < margin) {
           nextColumn();
-          x = margin + col * (colW + gap);
+          x = colX();
         }
-        put(line.text, line.size * fontScale, line.bold, x, y);
-        y -= lineH;
+        put(line.text, line.size, line.bold, x, y);
+        y -= lh;
       });
-      y -= 7;
+      y -= 14;
     });
 
-    /* Answer key always starts on a new page. */
-    if (current.length) pages.push(current);
-    current = [];
-    y = H - margin;
-    col = 0;
-    put('Answer key', 16, true, margin, y);
-    y -= 24;
-    var keyChars = Math.max(25, Math.floor(usableW / 5.2));
+    // --- Answer key: always starts on a fresh page ---
+    newPage();
+    put('Answer Key', 16, true, margin, y);
+    y -= 12;
+    rule(margin, y, usableW);
+    y -= 20;
+
     (data.items || []).forEach(function (item, index) {
-      var keyLines = wrapPdf((index + 1) + '. ' + answerText(item), keyChars);
-      keyLines.forEach(function (line) {
-        if (y - 13 < margin) { newPage(); }
-        var x = margin + col * (colW + gap);
-        put(line, 9, false, x, y);
-        y -= 13;
-      });
-      y -= 4;
-    });
-    if (current.length) pages.push(current);
+      var keyLines = wrapMeasured((index + 1) + '. ' + answerText(item), colW, 9, false);
+      var needed = keyLines.length * lineHeightOf(9) + 4;
+      var atColumnTop = y >= H - margin - 1;
 
-    /* Build a compact, standards-compliant PDF using built-in Helvetica. */
+      if (y - needed < margin && !atColumnTop) {
+        nextColumn();
+      }
+
+      var x = colX();
+      keyLines.forEach(function (line) {
+        if (y - lineHeightOf(9) < margin) {
+          nextColumn();
+          x = colX();
+        }
+        put(line, 9, false, x, y);
+        y -= lineHeightOf(9);
+      });
+      y -= 6;
+    });
+
+    flushPage();
+
+    // --- Build a compact, standards-compliant PDF using built-in Helvetica. ---
     var objects = [];
     function obj(body) { objects.push(body); return objects.length; }
     var pagesId = obj('');
@@ -472,14 +558,20 @@
     var pageIds = [];
 
     pages.forEach(function (commands) {
-      var content = 'q\nBT\n';
+      var content = 'q\n';
       commands.forEach(function (cmd) {
-        var font = cmd.bold ? boldFontId : fontId;
-        content += '/F' + (cmd.bold ? 'B' : 'N') + ' ' + cmd.size.toFixed(2) + ' Tf\n';
+        if (cmd.rule) {
+          content += '0.6 w\n0.75 G\n' +
+            cmd.x.toFixed(2) + ' ' + cmd.y.toFixed(2) + ' m\n' +
+            (cmd.x + cmd.width).toFixed(2) + ' ' + cmd.y.toFixed(2) + ' l\nS\n';
+          return;
+        }
+        var font = cmd.bold ? 'FB' : 'FN';
+        content += 'BT\n/' + font + ' ' + cmd.size.toFixed(2) + ' Tf\n';
         content += '1 0 0 1 ' + cmd.x.toFixed(2) + ' ' + cmd.y.toFixed(2) + ' Tm\n';
-        content += '(' + pdfEscape(cmd.text) + ') Tj\n';
+        content += '(' + pdfEscape(cmd.text) + ') Tj\nET\n';
       });
-      content += 'ET\nQ\n';
+      content += 'Q\n';
       var contentId = obj('<< /Length ' + content.length + ' >>\nstream\n' + content + 'endstream');
       var pageId = obj('<< /Type /Page /Parent ' + pagesId + ' 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /FN ' + fontId + ' 0 R /FB ' + boldFontId + ' 0 R >> >> /Contents ' + contentId + ' 0 R >>');
       pageIds.push(pageId);
@@ -519,16 +611,6 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
     return { name: name, columns: columns === 2 || columns === 3 ? columns : 1, size: blob.size };
   }
-
-  function pdfFileName(title) {
-    var slug = String(title == null ? '' : title)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48);
-    return 'acadex-' + (slug || 'quiz') + '.pdf';
-  }
-
 
   root.AR = root.AR || {};
   root.AR.exporter = {
