@@ -59,8 +59,11 @@
   var exportHtml = $('export-html');
   var exportPdf = $('export-pdf');
   var exportPdfDownload = $('export-pdf-download');
+  var exportNotes = $('export-notes');
+  var exportNotesDownload = $('export-notes-download');
   var exportCancel = $('export-cancel');
   var pdfLayout = $('pdf-layout');
+  var notesLayout = $('notes-layout');
 
   function show(node, on) {
     if (node) node.classList.toggle('hidden', !on);
@@ -239,11 +242,21 @@
     return value === 2 || value === 3 ? value : 1;
   }
 
+  // Same idea as selectedPdfColumns(), for the notes-style PDF's own
+  // 1/2/3-column radio group.
+  function selectedNotesColumns() {
+    var chosen = document.querySelector('input[name="notes-layout"]:checked');
+    var value = chosen ? Number(chosen.value) : 1;
+    return value === 2 || value === 3 ? value : 1;
+  }
+
   function closeExportChooser() {
     show(exportChooser, false);
     if (exportChooser) exportChooser.setAttribute('aria-hidden', 'true');
     show(pdfLayout, false);
     show(exportPdfDownload, false);
+    show(notesLayout, false);
+    show(exportNotesDownload, false);
   }
 
   function openExportChooser() {
@@ -251,6 +264,7 @@
     show(exportChooser, true);
     if (exportChooser) exportChooser.setAttribute('aria-hidden', 'false');
     show(pdfLayout, false);
+    show(notesLayout, false);
     if (exportHtml) exportHtml.focus();
   }
 
@@ -501,6 +515,35 @@
         exportPdfDownload.textContent = 'Download PDF';
       }
     });
+    // Third export option: notes-style PDF (question immediately followed by
+    // its answer, no blanks). Wired exactly like the exam-PDF option above —
+    // same show/focus-on-pick, same disable/label/restore around the async
+    // work, same status message shape. Guarded on both elements existing so
+    // a page whose markup hasn't added the "export-notes" / "export-notes-
+    // download" elements yet still boots normally, leaving the HTML/PDF
+    // paths completely untouched.
+    if (exportNotes && exportNotesDownload) {
+      exportNotes.addEventListener('click', function () {
+        show(notesLayout, true);
+        show(exportNotesDownload, true);
+        exportNotesDownload.focus();
+      });
+      exportNotesDownload.addEventListener('click', function () {
+        var columns = selectedNotesColumns();
+        exportNotesDownload.disabled = true;
+        exportNotesDownload.textContent = 'Creating notes PDF...';
+        try {
+          var result = AR.exporter.downloadNotes(paper, columns);
+          closeExportChooser();
+          say(status, result.name + ' downloaded (' + columns + '-column layout).');
+        } catch (err) {
+          say(status, err && err.message ? err.message : 'The notes PDF could not be created.', true);
+        } finally {
+          exportNotesDownload.disabled = false;
+          exportNotesDownload.textContent = 'Download Notes PDF';
+        }
+      });
+    }
     exportChooser.addEventListener('click', function (event) {
       if (event.target === exportChooser) closeExportChooser();
     });
