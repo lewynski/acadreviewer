@@ -488,7 +488,7 @@
     objects[pagesId - 1] = '<< /Type /Pages /Kids [' + pageIds.map(function (id) { return id + ' 0 R'; }).join(' ') + '] /Count ' + pageIds.length + ' >>';
     var catalogId = obj('<< /Type /Catalog /Pages ' + pagesId + ' 0 R >>');
 
-    var pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
+    var pdf = '%PDF-1.4\n%Acadex PDF\n';
     var offsets = [0];
     objects.forEach(function (body, i) {
       offsets[i + 1] = pdf.length;
@@ -538,7 +538,6 @@
     keySheet: keySheet,
     answerText: answerText,
     fileName: fileName,
-    printPDF: printPDF,
     pdfPage: pdfPage,
     downloadPDF: downloadPDF,
     pdfFileName: pdfFileName,
