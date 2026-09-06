@@ -1029,8 +1029,13 @@ button.tile {
   line-height: 1.6;
 }
 
-.footer p {
+/* Prose is held to a readable measure and centred in the page, so on a wide
+   screen the footer sits under the middle of the content rather than hugging
+   the left edge. :not(.credit) keeps this off the credit line, which spans the
+   full width -- a plain .credit rule would lose to .footer p on specificity. */
+.footer p:not(.credit) {
   max-width: 46em;
+  margin-inline: auto;
 }
 
 .footer p + p {
@@ -1042,12 +1047,11 @@ button.tile {
 }
 
 .credit {
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 24px;
+  padding-top: 18px;
   border-top: 1px solid var(--hair);
   font-weight: 500;
   text-align: center;
-  max-width: none;
 }
 
 .section {
