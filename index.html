@@ -9,6 +9,69 @@
       content="Turn your lecture slides and handouts into a reviewer you can take, score, and keep for offline study."
     />
     <link rel="stylesheet" href="assets/css/style.css" />
+    <style>
+      /* Export chooser: intentionally self-contained so the existing stylesheet stays untouched. */
+      .export-dialog[hidden] { display: none !important; }
+      .export-dialog {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, .55);
+      }
+      .export-card {
+        width: min(520px, 100%);
+        background: var(--panel, #fff);
+        color: inherit;
+        border: 1px solid rgba(127,127,127,.25);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      }
+      .export-card h2 { margin: 0 0 8px; }
+      .export-note { margin: 0 0 20px; opacity: .75; }
+      .export-options {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .export-option {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 1px solid rgba(127,127,127,.3);
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      .export-option:hover { border-color: currentColor; }
+      .export-option strong { display: block; margin-bottom: 3px; }
+      .export-option span { opacity: .7; font-size: .92em; }
+      .pdf-layout[hidden] { display: none !important; }
+      .pdf-layout {
+        border: 1px solid rgba(127,127,127,.25);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 18px;
+      }
+      .pdf-layout legend { padding: 0 6px; font-weight: 600; }
+      .pdf-layout label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin: 7px 14px 7px 0;
+        cursor: pointer;
+      }
+      .export-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+    </style>
     <script>
       /* Before first paint, so a remembered light choice does not flash black. */
       try {
@@ -153,6 +216,38 @@
         </div>
       </section>
     </main>
+
+    <!-- Export format chooser -->
+    <div class="export-dialog" id="export-chooser" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="export-title">
+      <div class="export-card">
+        <h2 id="export-title">Save your reviewer</h2>
+        <p class="export-note">Choose how you want to keep this reviewer.</p>
+
+        <div class="export-options">
+          <button class="export-option" id="export-html" type="button">
+            <strong>HTML Reviewer</strong>
+            <span>Keep the current interactive offline reviewer. Nothing changes.</span>
+          </button>
+
+          <button class="export-option" id="export-pdf" type="button">
+            <strong>PDF Reviewer</strong>
+            <span>Create a printable PDF-style reviewer with your chosen column layout.</span>
+          </button>
+        </div>
+
+        <fieldset class="pdf-layout" id="pdf-layout" hidden>
+          <legend>PDF layout</legend>
+          <label><input type="radio" name="pdf-layout" value="1" checked /> Single column</label>
+          <label><input type="radio" name="pdf-layout" value="2" /> 2 columns</label>
+          <label><input type="radio" name="pdf-layout" value="3" /> 3 columns</label>
+        </fieldset>
+
+        <div class="export-actions">
+          <button class="btn btn-quiet" id="export-cancel" type="button">Cancel</button>
+          <button class="btn hidden" id="export-pdf-download" type="button">Download PDF</button>
+        </div>
+      </div>
+    </div>
 
     <div id="dock"></div>
 
