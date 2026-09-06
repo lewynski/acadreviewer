@@ -540,6 +540,7 @@
     fileName: fileName,
     printPDF: printPDF,
     pdfPage: pdfPage,
+    downloadPDF: downloadPDF,
     pdfFileName: pdfFileName,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
