@@ -236,6 +236,11 @@
             <strong>PDF Reviewer</strong>
             <span>Create a printable PDF-style reviewer with your chosen column layout.</span>
           </button>
+
+          <button class="export-option" id="export-notes" type="button">
+            <strong>Notes PDF</strong>
+            <span>Each question immediately followed by its answer, no blanks, not a test. Choose a column layout.</span>
+          </button>
         </div>
 
         <fieldset class="pdf-layout hidden" id="pdf-layout">
@@ -245,9 +250,17 @@
           <label><input type="radio" name="pdf-layout" value="3" /> 3 columns</label>
         </fieldset>
 
+        <fieldset class="pdf-layout hidden" id="notes-layout">
+          <legend>Notes layout</legend>
+          <label><input type="radio" name="notes-layout" value="1" checked /> Single column</label>
+          <label><input type="radio" name="notes-layout" value="2" /> 2 columns</label>
+          <label><input type="radio" name="notes-layout" value="3" /> 3 columns</label>
+        </fieldset>
+
         <div class="export-actions">
           <button class="btn btn-quiet" id="export-cancel" type="button">Cancel</button>
           <button class="btn hidden" id="export-pdf-download" type="button">Download PDF</button>
+          <button class="btn hidden" id="export-notes-download" type="button">Download Notes PDF</button>
         </div>
       </div>
     </div>
