@@ -1,6 +1,55 @@
-/* Academic Reviewer: one stylesheet, shared by the app and the offline export. */
+/* Acadex: one stylesheet, shared by the app and the offline export. */
 
+/* Measurements, not colours: the same whichever theme is on. */
 :root {
+  --shell: 980px;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark is what you get unless you ask for otherwise. The theme button writes
+   data-theme on <html>, and that beats the machine's own preference either way,
+   so a choice made here is the choice that sticks. */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --paper: #1c1c1e;
+  --ink: #f5f5f7;
+  --soft: #98989d;
+  --line: #38383a;
+  --hair: rgba(255, 255, 255, 0.14);
+  --accent: #0a84ff;
+  --accent-soft: rgba(10, 132, 255, 0.18);
+  --right: #30d158;
+  --right-soft: rgba(48, 209, 88, 0.16);
+  --wrong: #ff453a;
+  --wrong-soft: rgba(255, 69, 58, 0.16);
+  --idle: #2c2c2e;
+}
+
+/* The app always writes data-theme, so this only reaches pages that do not:
+   the saved offline file, which has no button and follows the device instead. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --paper: #ffffff;
+    --ink: #1d1d1f;
+    --soft: #6e6e73;
+    --line: #d2d2d7;
+    --hair: rgba(0, 0, 0, 0.09);
+    --accent: #0071e3;
+    --accent-soft: rgba(0, 113, 227, 0.08);
+    --right: #248a3d;
+    --right-soft: rgba(36, 138, 61, 0.1);
+    --wrong: #d70015;
+    --wrong-soft: rgba(215, 0, 21, 0.07);
+    --idle: #dcdce1;
+  }
+}
+
+[data-theme="light"] {
   color-scheme: light;
   --bg: #f5f5f7;
   --paper: #ffffff;
@@ -15,28 +64,6 @@
   --wrong: #d70015;
   --wrong-soft: rgba(215, 0, 21, 0.07);
   --idle: #dcdce1;
-  --shell: 980px;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #000000;
-    --paper: #1c1c1e;
-    --ink: #f5f5f7;
-    --soft: #98989d;
-    --line: #38383a;
-    --hair: rgba(255, 255, 255, 0.14);
-    --accent: #0a84ff;
-    --accent-soft: rgba(10, 132, 255, 0.18);
-    --right: #30d158;
-    --right-soft: rgba(48, 209, 88, 0.16);
-    --wrong: #ff453a;
-    --wrong-soft: rgba(255, 69, 58, 0.16);
-    --idle: #2c2c2e;
-  }
 }
 
 *,
@@ -140,6 +167,32 @@ p {
 .masthead .btn-small {
   font-size: 13px;
   padding: 6px 13px;
+}
+
+/* Sun or moon, as wide as it is tall so it reads as one mark rather than a
+   button with a label in it. */
+.theme {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  appearance: none;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.theme:hover {
+  background: var(--idle);
+  border-color: var(--line);
 }
 
 .hero {
@@ -571,6 +624,119 @@ button.tile {
   }
 }
 
+/* On a phone there is no room for a label and its control on one line, so every
+   settings row stacks: label first, control under it and across the full width.
+   Without this the auto margins push the control onto the label. */
+@media (max-width: 620px) {
+  .shell,
+  .masthead-in,
+  .dock-in {
+    width: min(100% - 28px, var(--shell));
+  }
+
+  .panel {
+    padding: 20px 18px;
+    border-radius: 16px;
+  }
+
+  .drop {
+    padding: 40px 18px;
+  }
+
+  .hero {
+    padding: 48px 0 28px;
+  }
+
+  .mix-row,
+  .field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .stepper,
+  .seg,
+  .field .answer {
+    margin-left: 0;
+  }
+
+  /* Both controls spread across the row, so the taps are wide and even. */
+  .stepper {
+    justify-content: space-between;
+    align-self: stretch;
+  }
+
+  .step-value {
+    flex: 1 1 auto;
+    font-size: 19px;
+  }
+
+  .step-btn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+  }
+
+  .seg {
+    align-self: stretch;
+  }
+
+  .seg-btn {
+    flex: 1 1 0;
+    padding: 11px 6px;
+    text-align: center;
+  }
+
+  .field .answer {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* A matching row is a term over its dropdown, not beside it. */
+  .pair {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .pair-left {
+    flex: 0 0 auto;
+  }
+
+  .pick {
+    width: 100%;
+  }
+
+  /* Label and score on the first line, the bar underneath spanning both. */
+  .bar-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+
+  .bar-row .track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .bar-count {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .actions .btn,
+  .dock-in .btn {
+    flex: 1 1 100%;
+  }
+
+  .file-meta {
+    margin-left: 0;
+  }
+
+  .footer {
+    padding: 32px 0 44px;
+  }
+}
+
 .choices {
   display: grid;
   gap: 8px;
@@ -863,15 +1029,25 @@ button.tile {
   line-height: 1.6;
 }
 
+.footer p {
+  max-width: 46em;
+}
+
+.footer p + p {
+  margin-top: 14px;
+}
+
 .footer a {
   color: var(--soft);
 }
 
 .credit {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
   border-top: 1px solid var(--hair);
   font-weight: 500;
+  text-align: center;
+  max-width: none;
 }
 
 .section {

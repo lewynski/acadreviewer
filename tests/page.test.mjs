@@ -23,9 +23,11 @@ test('the ids the quiz engine and the export rely on are there', () => {
 });
 
 test('nothing is loaded that is not in the repo', () => {
-  const paths = all(page, /(?:src|href)="([^"]+)"/g);
-  assert.ok(paths.length > 5);
-  paths.forEach((at) => {
+  /* Links a reader can click are allowed to leave; anything the browser fetches
+     on its own -- scripts, stylesheets, images -- must be in this repo. */
+  const fetched = all(page, /(?:\ssrc="([^"]+)")/g).concat(all(page, /<link\s[^>]*href="([^"]+)"/g));
+  assert.ok(fetched.length > 5);
+  fetched.forEach((at) => {
     assert.ok(!/^https?:/.test(at), 'the page should not reach out to ' + at);
     assert.ok(fs.existsSync(new URL('../' + at, import.meta.url)), 'missing file: ' + at);
   });
@@ -33,6 +35,18 @@ test('nothing is loaded that is not in the repo', () => {
     all(page, /<script src="assets\/js\/([a-z]+)\.js" defer><\/script>/g),
     ['zip', 'extract', 'grade', 'quiz', 'generate', 'exporter', 'app']
   );
+});
+
+test('the ways to reach the developer are spelled the same everywhere', () => {
+  const links = all(page, /<a\s[^>]*href="([^"]+)"/g);
+  assert.ok(links.includes('mailto:report@jonlewynv.online'), 'the report address should be a mailto link');
+  assert.ok(links.includes('https://www.jonlewynv.online/'), 'the website should be linked');
+  links.forEach((at) => {
+    assert.ok(/^(mailto:|https:\/\/)/.test(at), 'links leaving the page should be mailto: or https: -- ' + at);
+  });
+  assert.match(page, /educational use only/i);
+  assert.match(page, /static website/i);
+  assert.match(page, /<p class="credit">Developer: Jon Lewyn V\. Tanggaro<\/p>/);
 });
 
 test('the class names the app hands out are all styled', () => {

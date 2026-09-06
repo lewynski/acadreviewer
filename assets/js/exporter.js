@@ -147,8 +147,8 @@
       '<main id="app"></main>',
       '<noscript><p class="note">This reviewer needs JavaScript to mark your answers. The answer key still prints.</p></noscript>',
       keySheet(data.items || []),
-      '<p class="footer">' + esc(made + from) + '. Saved from Academic Reviewer, works with no internet.',
-      '<br>Developer: Jon Lewyn Tanggaro</p>',
+      '<p class="footer">' + esc(made + from) + '. Saved from Acadex, works with no internet.',
+      '<br>For educational use only.</p>',
       '</div>',
       '<div id="dock"></div>',
       '<script type="application/json" id="ar-data">',
@@ -181,7 +181,7 @@
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 48);
-    return 'academic-reviewer-' + (slug || 'quiz') + '.html';
+    return 'acadex-' + (slug || 'quiz') + '.html';
   }
 
   /** Builds the file without saving it, so callers can show its size first. */

@@ -11,6 +11,7 @@
   var MAX_EACH = 25;
   var MAX_TOTAL = 60;
   var CODE_STORE = 'ar-code';
+  var THEME_STORE = 'ar-theme';
 
   var HINTS = {
     recall: 'Terms, values and definitions, straight from the material.',
@@ -51,6 +52,9 @@
   var track = $('track');
   var fill = $('track-fill');
   var status = $('status');
+  var themeBtn = $('theme');
+  var themeMark = $('theme-mark');
+  var themeSaid = $('theme-said');
 
   function show(node, on) {
     if (node) node.classList.toggle('hidden', !on);
@@ -341,7 +345,53 @@
     drop.classList.toggle('is-hot', on);
   }
 
+  /**
+   * The theme button. Dark is what a first visit gets; a choice is remembered on
+   * this device and wins over whatever the system prefers. Only an explicit
+   * "light" turns the lights on, so anything unreadable in storage lands on the
+   * default rather than somewhere in between.
+   */
+  function themeNow() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  }
+
+  function paintTheme() {
+    var dark = themeNow() === 'dark';
+    var next = dark ? 'Switch to light' : 'Switch to dark';
+    /* Escaped so every shipped file stays plain ASCII: crescent moon, sun. */
+    themeMark.textContent = dark ? '\u263d' : '\u2600';
+    themeSaid.textContent = next;
+    themeBtn.setAttribute('title', next);
+    themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+  }
+
+  function setTheme(pick) {
+    document.documentElement.setAttribute('data-theme', pick === 'light' ? 'light' : 'dark');
+    paintTheme();
+    try {
+      localStorage.setItem(THEME_STORE, themeNow());
+    } catch (err) {
+      /* a device that refuses storage still gets the theme, just not the memory */
+    }
+  }
+
+  function startTheme() {
+    var saved = null;
+    try {
+      saved = localStorage.getItem(THEME_STORE);
+    } catch (err) {
+      saved = null;
+    }
+    document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+    paintTheme();
+    themeBtn.addEventListener('click', function () {
+      setTheme(themeNow() === 'dark' ? 'light' : 'dark');
+    });
+  }
+
   function start() {
+    startTheme();
+
     input.addEventListener('change', function () {
       addFiles(input.files);
     });

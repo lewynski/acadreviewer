@@ -3,20 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Academic Reviewer</title>
+    <title>Acadex</title>
     <meta
       name="description"
       content="Turn your lecture slides and handouts into a reviewer you can take, score, and keep for offline study."
     />
     <link rel="stylesheet" href="assets/css/style.css" />
+    <script>
+      /* Before first paint, so a remembered light choice does not flash black. */
+      try {
+        var pick = localStorage.getItem('ar-theme');
+        document.documentElement.setAttribute('data-theme', pick === 'light' ? 'light' : 'dark');
+      } catch (err) {}
+    </script>
   </head>
   <body>
     <header class="masthead">
       <div class="masthead-in">
-        <span class="wordmark">Academic Reviewer</span>
+        <span class="wordmark">Acadex</span>
         <span class="masthead-right">
           <span class="masthead-meta" id="head-meta">Nothing uploaded yet</span>
           <button class="btn btn-quiet btn-small hidden" id="keep" type="button">Save as file</button>
+          <button class="theme" id="theme" type="button" aria-pressed="false" title="Switch to dark">
+            <span aria-hidden="true" id="theme-mark">&#9788;</span>
+            <span class="sr" id="theme-said">Switch to dark</span>
+          </button>
         </span>
       </div>
     </header>
@@ -150,7 +161,16 @@
         Files are read in your browser. Only the text found in them is sent out, and only to write the questions.
         Answers are marked on your own device.
       </p>
-      <p class="credit">Developer: Jon Lewyn Tanggaro</p>
+      <p>
+        For educational use only. Study from it, do not submit it as your own work, and check anything it says
+        against your own material before you rely on it. This is a static website: it holds no accounts, keeps no
+        profiles, and has nothing to post from, so nothing here can reach anyone's social media.
+      </p>
+      <p>
+        Concerns or a bug to report: <a href="mailto:report@jonlewynv.online">report@jonlewynv.online</a><br />
+        Website: <a href="https://www.jonlewynv.online/" rel="noopener">www.jonlewynv.online</a>
+      </p>
+      <p class="credit">Developer: Jon Lewyn V. Tanggaro</p>
     </footer>
 
     <script src="assets/js/zip.js" defer></script>

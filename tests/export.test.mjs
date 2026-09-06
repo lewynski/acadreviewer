@@ -94,14 +94,14 @@ test('the key sheet is numbered and escaped', () => {
 });
 
 test('the file name is a slug of the title', () => {
-  assert.equal(exporter.fileName('Circuits <midterm> & "review"'), 'academic-reviewer-circuits-midterm-review.html');
-  assert.equal(exporter.fileName(''), 'academic-reviewer-quiz.html');
-  assert.equal(exporter.fileName('!!!'), 'academic-reviewer-quiz.html');
+  assert.equal(exporter.fileName('Circuits <midterm> & "review"'), 'acadex-circuits-midterm-review.html');
+  assert.equal(exporter.fileName(''), 'acadex-quiz.html');
+  assert.equal(exporter.fileName('!!!'), 'acadex-quiz.html');
 });
 
 test('the built file is one self-contained page', async () => {
   const file = await exporter.build(data);
-  assert.equal(file.name, 'academic-reviewer-circuits-midterm-review.html');
+  assert.equal(file.name, 'acadex-circuits-midterm-review.html');
   assert.match(file.text, /^<!doctype html>/);
   assert.match(file.text, /<meta charset="utf-8">/);
   assert.match(file.text, /<title>Circuits &lt;midterm&gt; &amp; &quot;review&quot;<\/title>/);

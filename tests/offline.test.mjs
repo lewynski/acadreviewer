@@ -118,6 +118,6 @@ test('the printed key sheet is the answers, and only prints', async () => {
   assert.match(file.text, /<section class="section keysheet print-only">/);
   const rows = [...file.text.matchAll(/<span class="key-a">([\s\S]*?)<\/span>/g)].map((hit) => hit[1]);
   assert.deepEqual(rows, ['B. ohm', "Ohm's law"]);
-  assert.equal(file.name, 'academic-reviewer-circuits-week-1.html');
+  assert.equal(file.name, 'acadex-circuits-week-1.html');
   assert.match(file.text, /Made 6 September 2026 from Lecture1\.pptx/);
 });

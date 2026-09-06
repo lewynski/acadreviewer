@@ -1,4 +1,4 @@
-# Academic Reviewer
+# Acadex
 
 Upload the lecture slides and handouts you are studying, and get back a reviewer:
 multiple choice, identification, enumeration and matching questions drawn from the
@@ -26,9 +26,9 @@ so the offline copy is the same engine, not a second implementation of it.
 ```bash
 git init
 git add .
-git commit -m "Academic Reviewer"
+git commit -m "Acadex"
 git branch -M main
-git remote add origin https://github.com/<you>/academic-reviewer.git
+git remote add origin https://github.com/<you>/acadex.git
 git push -u origin main
 ```
 
@@ -89,23 +89,27 @@ vercel dev                   # http://localhost:3000
 ```
 
 ```bash
-npm test                     # 81 tests, no network, no install
+npm test                     # 100 tests, no network, no install
 ```
 
 The tests run on Node 20+ with nothing installed: no dependencies, no test framework
-beyond `node --test`, and nothing that reaches the network — Groq is stubbed, so the
-suite costs nothing to run. They cover the zip reader, the grader's answer matching, the
-prompt and validator, batching and allocation, the quiz engine and scoreboard against a
-stub DOM (both modes, partial credit, the coverage lattice, retakes), and the agreement
-between `index.html`, `app.js` and the stylesheet.
+beyond `node --test`, and nothing that reaches the network — Groq and pdf.js are both
+stubbed, so the suite costs nothing to run. They cover the zip reader, the grader's answer
+matching, the prompt and validator, batching and allocation, the file reader (a page per
+PDF page, a scan reported as a scan, the formats it cannot open, the 400-unit cap), the
+quiz engine and scoreboard against a stub DOM (both modes, partial credit, the coverage
+lattice, retakes), the theme switch, the narrow-screen rules, and the agreement between
+`index.html`, `app.js` and the stylesheet.
 
-Two of them are worth knowing about. The function in `api/generate.js` is tested with a
+Three of them are worth knowing about. The function in `api/generate.js` is tested with a
 stubbed Groq: the access code turning requests away before they cost anything, the per-IP
 cap, a retired model being stepped over, and each way Groq can refuse arriving as
-something a reader can act on. And the file you download is taken apart, put on an
-otherwise empty page with the `AR` namespace deleted, and made to boot, mark answers and
-store an attempt on its own — including a question whose text tries to close the script
-tag. If the export ever drifts from the app, that test fails.
+something a reader can act on. The file you download is taken apart, put on an otherwise
+empty page with the `AR` namespace deleted, and made to boot, mark answers and store an
+attempt on its own — including a question whose text tries to close the script tag. If the
+export ever drifts from the app, that test fails. And the PDF stub is a real ES module, so
+its namespace is sealed exactly like the copy from a CDN: the loader is held to touching
+only what it is allowed to touch.
 
 ## What it reads
 

@@ -1,5 +1,5 @@
 /**
- * Answer checking for Academic Reviewer.
+ * Answer checking for Acadex.
  *
  * Deliberately free of DOM code: this same file is unit tested in Node and
  * inlined verbatim into the downloadable offline reviewer.
