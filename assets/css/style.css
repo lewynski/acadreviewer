@@ -867,6 +867,13 @@ button.tile {
   color: var(--soft);
 }
 
+.credit {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  font-weight: 500;
+}
+
 .section {
   padding: 26px 0;
 }
