@@ -279,7 +279,13 @@
     return String(value == null ? '' : value)
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
-      .replace(/[\u2013\u2014]/g, '-')
+      // Every Unicode dash/hyphen variant - not just en/em dash - collapses
+      // to a plain ASCII hyphen. AI-written text tends to use \u2010/\u2011
+      // (a plain "hyphen" and a "non-breaking hyphen") for compound words
+      // like "ten-year" or "Tydings-McDuffie", and those two code points
+      // were slipping past the old narrower check straight into the '?'
+      // catch-all below.
+      .replace(/[\u2010-\u2015\u2212]/g, '-')
       .replace(/\u2026/g, '...')
       .replace(/\u00A0/g, ' ')
       .replace(/[À-ÿ]/g, function (ch) { return ACCENTS[ch] || ch; })
