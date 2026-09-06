@@ -22,6 +22,10 @@
  *   - questionPrompt() falls back across several possible question-text
  *     field names, so a question never renders blank just because the data
  *     uses a different key
+ *   - accented Latin letters (e, n, u with marks, etc.) are flattened to
+ *     plain ASCII before being written into the PDF, since the hand-rolled
+ *     Helvetica text objects here store one raw byte per character and an
+ *     accented letter would otherwise turn into a stray symbol on the page
  */
 (function (root) {
   'use strict';
@@ -248,6 +252,29 @@
 
   /* ---------------- Shared PDF plumbing ---------------- */
 
+  // Common Latin-1 accented letters, flattened to plain ASCII. The manual
+  // PDF writer below emits raw single-byte string literals for the built-in
+  // Helvetica font (there is no embedded encoding table), and the browser's
+  // Blob constructor UTF-8-encodes any character above \x7F when the final
+  // PDF string is turned into bytes. Passing an accented letter straight
+  // through therefore does not survive as one byte in the file - it becomes
+  // two (or more) bytes that the PDF reader displays as separate, unrelated
+  // glyphs, which is what shows up on the page as a stray symbol next to the
+  // intended letter (e.g. "Jose" with a caret-like mark instead of the accent
+  // on the e). Flattening here keeps every character a single, correct byte.
+  var ACCENTS = {
+    'À': 'A', 'Á': 'A', 'Â': 'A', 'Ã': 'A', 'Ä': 'A', 'Å': 'A', 'Æ': 'AE',
+    'Ç': 'C', 'È': 'E', 'É': 'E', 'Ê': 'E', 'Ë': 'E',
+    'Ì': 'I', 'Í': 'I', 'Î': 'I', 'Ï': 'I', 'Ð': 'D', 'Ñ': 'N',
+    'Ò': 'O', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ö': 'O', 'Ø': 'O',
+    'Ù': 'U', 'Ú': 'U', 'Û': 'U', 'Ü': 'U', 'Ý': 'Y', 'Þ': 'Th', 'ß': 'ss',
+    'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'æ': 'ae',
+    'ç': 'c', 'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+    'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', 'ð': 'd', 'ñ': 'n',
+    'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o',
+    'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ý': 'y', 'þ': 'th', 'ÿ': 'y',
+  };
+
   function pdfText(value) {
     return String(value == null ? '' : value)
       .replace(/[\u2018\u2019]/g, "'")
@@ -255,7 +282,8 @@
       .replace(/[\u2013\u2014]/g, '-')
       .replace(/\u2026/g, '...')
       .replace(/\u00A0/g, ' ')
-      .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '?');
+      .replace(/[À-ÿ]/g, function (ch) { return ACCENTS[ch] || ch; })
+      .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '?');
   }
 
   function pdfEscape(value) {
@@ -400,8 +428,9 @@
       pageContentTop = y;
     }
 
-    // Places a pre-wrapped block of {text, size, bold} lines, keeping it
-    // together where it fits and flowing to the next column/page otherwise.
+    // Places a pre-wrapped block of {text, size, bold, indent?} lines,
+    // keeping it together where it fits and flowing to the next
+    // column/page otherwise.
     function placeBlock(lines, gapAfter) {
       var needed = blockHeight(lines) + 6;
       if (y - needed < margin && y < pageContentTop - 1) {
@@ -414,7 +443,10 @@
           nextColumn();
           x = colX();
         }
-        put(line.text, line.size, line.bold, x, y);
+        // A per-line "indent" (points) offsets that line to the right of the
+        // column's left edge without moving where the next column/page
+        // starts - used to align the notes answer lines under their question.
+        put(line.text, line.size, line.bold, x + (line.indent || 0), y);
         y -= lh;
       });
       y -= (gapAfter == null ? 14 : gapAfter);
@@ -735,13 +767,17 @@
       '</body></html>';
   }
 
-  // Builds the flat list of {text, size, bold} lines for one note: the
-  // question, then its answer indented and labeled underneath — no blanks,
-  // no choices, just what to review.
+  // Builds the flat list of {text, size, bold, indent?} lines for one note:
+  // the question, then its answer indented and labeled underneath — no
+  // blanks, no choices, just what to review. The answer lines get a real
+  // geometric indent (points, applied at placement time) instead of literal
+  // leading spaces, so they line up on one true left edge no matter the
+  // font size or how many times a long answer wraps.
   function pdfNoteLines(item, number, colWidthPx, fontScale) {
     var lines = [];
     var titleSize = 10 * fontScale;
     var bodySize = 9 * fontScale;
+    var answerIndent = 12 * fontScale;
 
     wrapMeasured(number + '. ' + questionPrompt(item), colWidthPx, titleSize, true).forEach(function (line) {
       lines.push({ text: line, bold: true, size: titleSize });
@@ -749,8 +785,8 @@
 
     notesAnswerLines(item).forEach(function (answerLine, i) {
       var prefix = i === 0 ? 'Answer: ' : '';
-      wrapMeasured(prefix + answerLine, colWidthPx - 10, bodySize, false).forEach(function (line) {
-        lines.push({ text: '   ' + line, bold: false, size: bodySize });
+      wrapMeasured(prefix + answerLine, colWidthPx - answerIndent, bodySize, false).forEach(function (line) {
+        lines.push({ text: line, bold: false, size: bodySize, indent: answerIndent });
       });
     });
 
