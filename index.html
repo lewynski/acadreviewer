@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="assets/css/style.css" />
     <style>
       /* Export chooser: intentionally self-contained so the existing stylesheet stays untouched. */
-      .export-dialog[hidden] { display: none !important; }
       .export-dialog {
+        pointer-events: auto;
         position: fixed;
         inset: 0;
         z-index: 1000;
@@ -24,7 +24,7 @@
       .export-card {
         width: min(520px, 100%);
         background: var(--panel, #fff);
-        color: inherit;
+        color: #111;
         border: 1px solid rgba(127,127,127,.25);
         border-radius: 16px;
         padding: 24px;
@@ -49,6 +49,7 @@
         cursor: pointer;
       }
       .export-option:hover { border-color: currentColor; }
+      .export-option:focus-visible, .export-actions .btn:focus-visible { outline: 3px solid #1683ff; outline-offset: 2px; }
       .export-option strong { display: block; margin-bottom: 3px; }
       .export-option span { opacity: .7; font-size: .92em; }
       .pdf-layout[hidden] { display: none !important; }
@@ -67,6 +68,8 @@
         cursor: pointer;
       }
       .export-actions {
+        position: relative;
+        z-index: 2;
         display: flex;
         justify-content: flex-end;
         gap: 10px;
