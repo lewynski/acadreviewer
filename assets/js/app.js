@@ -8,8 +8,8 @@
 (function () {
   'use strict';
 
-  var MAX_EACH = 25;
-  var MAX_TOTAL = 60;
+  var MAX_EACH = 50;
+  var MAX_TOTAL = 150;
   var CODE_STORE = 'ar-code';
   var THEME_STORE = 'ar-theme';
 
